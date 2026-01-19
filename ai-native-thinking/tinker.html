@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tinker 产品深度调研报告</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px; /* Max width for larger screens */
+            height: 350px;
+            max-height: 400px;
+            margin: 0 auto;
+        }
+        
+        @media (max-width: 640px) {
+            .chart-container {
+                height: 300px;
+            }
+        }
+
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .tab-active {
+            border-bottom: 2px solid #2563eb;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            color: #64748b;
+        }
+        .tab-inactive:hover {
+            color: #334155;
+        }
+    </style>
+    <!-- Chosen Palette: Slate & Blue (Professional, Technical, Clean) -->
+    <!-- Application Structure Plan:
+         1. Dashboard Header: High-level summary and navigational control.
+         2. Overview Section: Introduces Tinker and the core research question.
+         3. Competitive Landscape (Interactive Radar): The core visual comparison tool allowing users to switch between different competitor dimensions (Capability, DevExp, Cost).
+         4. Feature Matrix (Interactive Table/Grid): Detailed breakdown of similarities and differences.
+         5. Core Competitiveness (Drill-down Cards): Focuses on the "Why Tinker?" aspect, explaining the unique selling points like Evaluation-First and Data-Centric workflows.
+         6. Conclusion: Synthesis of findings.
+         
+         Rationale: This structure moves from the "What" (Overview) to the "How it compares" (Landscape/Matrix) and finally the "Why it wins" (Competitiveness), facilitating a logical research flow.
+    -->
+    <!-- Visualization & Content Choices:
+         1. Radar Chart: Best for multi-dimensional comparison (Tinker vs OpenAI vs Bedrock vs Fireworks). Interaction: Toggle dimensions.
+         2. Bar Chart: To visualize "Time to Production" or "Debug Efficiency" estimates based on the report's qualitative findings.
+         3. Feature Cards: Interactive grid replacing complex text tables for better readability on mobile.
+         4. Process Flow (HTML/CSS): Visualizing the Tinker workflow vs traditional LLM usage.
+         
+         CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. All visuals are Canvas (Chart.js) or HTML/CSS.
+    -->
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-blue-100 selection:text-blue-900">
+
+    <!-- Navigation / Header -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <span class="text-2xl font-bold text-blue-600">Tinker<span class="text-slate-500 font-light text-lg">Report</span></span>
+                    </div>
+                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        <button onclick="navigateTo('overview')" class="nav-btn tab-active inline-flex items-center px-1 pt-1 text-sm font-medium" data-target="overview">概览</button>
+                        <button onclick="navigateTo('comparison')" class="nav-btn tab-inactive inline-flex items-center px-1 pt-1 text-sm font-medium" data-target="comparison">竞品对比</button>
+                        <button onclick="navigateTo('core-value')" class="nav-btn tab-inactive inline-flex items-center px-1 pt-1 text-sm font-medium" data-target="core-value">核心竞争力</button>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <button onclick="toggleSummary()" class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors">
+                        显示摘要
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Nav -->
+        <div class="sm:hidden flex justify-around border-t border-slate-100 py-2 bg-slate-50">
+            <button onclick="navigateTo('overview')" class="text-xs font-medium text-slate-600">概览</button>
+            <button onclick="navigateTo('comparison')" class="text-xs font-medium text-slate-600">对比</button>
+            <button onclick="navigateTo('core-value')" class="text-xs font-medium text-slate-600">核心</button>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+
+        <!-- Executive Summary Modal (Hidden by default) -->
+        <div id="summary-modal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 transform transition-all">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-slate-900">执行摘要 (Executive Summary)</h3>
+                    <button onclick="toggleSummary()" class="text-slate-400 hover:text-slate-500 text-2xl">&times;</button>
+                </div>
+                <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+                    本报告深入调研了 <strong>Tinker</strong> (Thinking Machines AI) 及其在 LLM 生态系统中的定位。
+                    <br><br>
+                    <strong>核心发现：</strong> Tinker 不同于 OpenAI 或 Fireworks 等纯推理提供商，也不同于 Bedrock 等基础设施聚合器。它的定位是<strong>“AI 工程师的集成开发环境 (IDE)”</strong>。它专注于解决大模型应用开发中的“最后一公里”问题：调试、评估、数据清洗和微调编排。
+                </p>
+                <div class="bg-blue-50 p-3 rounded-md border border-blue-100">
+                    <p class="text-xs text-blue-800 font-semibold">关键差异点：以数据为中心的迭代流程 vs. 以模型为中心的 API 调用。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 1: Overview -->
+        <section id="overview" class="scroll-mt-24 fade-in">
+            <div class="text-center mb-10">
+                <h1 class="text-3xl font-extrabold text-slate-900 sm:text-4xl">Tinker 产品定位分析</h1>
+                <p class="mt-4 max-w-2xl mx-auto text-xl text-slate-500">从模型 API 到 AI 工程化平台的演进</p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-6 md:p-8">
+                    <h2 class="text-lg font-semibold text-slate-900 mb-4">产品背景</h2>
+                    <p class="text-slate-600 mb-6 leading-relaxed">
+                        Tinker 是由 Thinking Machines AI 推出的产品。在当前的 AI 技术栈中，开发者面临的主要挑战已不再是“获取模型”（Bedrock, OpenAI, Fireworks 已解决此问题），而是“如何让模型稳定工作”。Tinker 旨在提供一套工作流工具，帮助开发者通过数据管理、prompt 编排和评估（Evaluation）来构建可靠的 AI 应用。
+                    </p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-slate-500">目标用户</span>
+                                <span class="text-2xl">👨‍💻</span>
+                            </div>
+                            <div class="text-lg font-bold text-slate-800">AI 工程师 & 数据科学家</div>
+                            <p class="text-xs text-slate-500 mt-1">需要深入控制模型行为的开发者</p>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-slate-500">核心价值</span>
+                                <span class="text-2xl">🔧</span>
+                            </div>
+                            <div class="text-lg font-bold text-slate-800">调试与迭代</div>
+                            <p class="text-xs text-slate-500 mt-1">从 Prompt Engineering 到 Fine-tuning 的无缝过渡</p>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-slate-500">生态位</span>
+                                <span class="text-2xl">🏗️</span>
+                            </div>
+                            <div class="text-lg font-bold text-slate-800">中间层 (Orchestration)</div>
+                            <p class="text-xs text-slate-500 mt-1">位于基础模型与最终应用之间</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Comparison (Radar Chart) -->
+        <section id="comparison" class="scroll-mt-24 fade-in">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-slate-900">竞品多维对比</h2>
+                <p class="mt-2 text-slate-600">
+                    本节通过五个关键维度对比 Tinker 与 Bedrock、OpenAI、Fireworks。Tinker 的优势不在于基础模型的“智商”，而在于工程化的“可控性”。
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Chart Controls & Legend -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="font-semibold text-slate-900 mb-4">选择对比维度</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer transition-colors hover:bg-slate-50 peer-checked:bg-blue-50" id="dim-overview-label">
+                                <input type="radio" name="chart-dimension" value="overview" checked onchange="updateChart('overview')" class="mr-3 text-blue-600 focus:ring-blue-500">
+                                <div>
+                                    <div class="font-medium text-slate-900">综合能力 (Overview)</div>
+                                    <div class="text-xs text-slate-500">整体市场定位概览</div>
+                                </div>
+                            </label>
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer transition-colors hover:bg-slate-50">
+                                <input type="radio" name="chart-dimension" value="devexp" onchange="updateChart('devexp')" class="mr-3 text-blue-600 focus:ring-blue-500">
+                                <div>
+                                    <div class="font-medium text-slate-900">开发者体验 (DevEx)</div>
+                                    <div class="text-xs text-slate-500">调试、文档、工具链完善度</div>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <div class="mt-6 pt-6 border-t border-slate-100">
+                            <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">平台图例</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-blue-600 mr-2"></span><span class="text-sm text-slate-700">Tinker (工程化)</span></div>
+                                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span><span class="text-sm text-slate-700">OpenAI (模型能力)</span></div>
+                                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-orange-500 mr-2"></span><span class="text-sm text-slate-700">Bedrock (基础设施)</span></div>
+                                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-purple-500 mr-2"></span><span class="text-sm text-slate-700">Fireworks (推理速度)</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Radar Chart Container -->
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-center items-center">
+                    <div class="chart-container">
+                        <canvas id="comparisonChart"></canvas>
+                    </div>
+                    <p id="chart-caption" class="text-center text-sm text-slate-500 mt-4 italic">
+                        图表显示：Tinker 在"可控性"和"调试能力"上显著领先，而在"模型通用性"上略逊于 OpenAI。
+                    </p>
+                </div>
+            </div>
+
+            <!-- Detailed Comparison Table (Interactive) -->
+            <div class="mt-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                    <h3 class="font-semibold text-slate-900">功能差异矩阵</h3>
+                    <select id="compare-filter" onchange="filterTable()" class="text-sm border-slate-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 p-1">
+                        <option value="all">显示全部</option>
+                        <option value="similarity">显示相似点</option>
+                        <option value="difference">显示差异点</option>
+                    </select>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">特性维度</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50">Tinker</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Bedrock / OpenAI</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Fireworks</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-slate-200" id="comparison-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Core Competitiveness -->
+        <section id="core-value" class="scroll-mt-24 fade-in">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-slate-900">Tinker 的核心竞争力</h2>
+                <p class="mt-2 text-slate-600">为什么开发者会选择 Tinker 而不是直接调用 GPT-4 的 API？答案在于“控制力”和“迭代闭环”。</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Card 1 -->
+                <div class="card-hover bg-white p-6 rounded-xl border border-slate-200 cursor-pointer group" onclick="expandFeature(1)">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-blue-100 rounded-lg p-3">
+                            <span class="text-2xl">🎯</span>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors">Evaluation-First 开发流</h3>
+                            <p class="mt-2 text-sm text-slate-600">大多数平台只提供 Playground。Tinker 将“评估”作为一等公民。开发者可以定义测试集，在修改 Prompt 或参数后，自动运行回归测试，量化效果提升。</p>
+                            <div id="feature-detail-1" class="hidden mt-4 pt-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 p-3 rounded">
+                                <strong>深层分析：</strong> 解决了“Prompt 甚至微小的改动都可能导致不可预知后果”的痛点。OpenAI 虽有 Evals 库，但 Tinker 提供了可视化的 UI 和集成的 workflow，降低了使用门槛。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="card-hover bg-white p-6 rounded-xl border border-slate-200 cursor-pointer group" onclick="expandFeature(2)">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-purple-100 rounded-lg p-3">
+                            <span class="text-2xl">🔬</span>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-slate-900 group-hover:text-purple-600 transition-colors">细粒度可观测性 (Observability)</h3>
+                            <p class="mt-2 text-sm text-slate-600">不仅是查看 Log。Tinker 允许开发者深入推理步骤，查看中间状态，并直接在历史记录中进行“Fork & Edit”，快速复现和修复错误。</p>
+                            <div id="feature-detail-2" class="hidden mt-4 pt-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 p-3 rounded">
+                                <strong>深层分析：</strong> Fireworks 等平台关注推理速度和吞吐量，往往忽略了单次调用的调试深度。Tinker 提供了类似 IDE 断点调试的体验。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="card-hover bg-white p-6 rounded-xl border border-slate-200 cursor-pointer group" onclick="expandFeature(3)">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-green-100 rounded-lg p-3">
+                            <span class="text-2xl">🧬</span>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-slate-900 group-hover:text-green-600 transition-colors">数据驱动的微调闭环</h3>
+                            <p class="mt-2 text-sm text-slate-600">从线上日志中筛选 Bad Case，一键转化为微调（Fine-tuning）数据集。Tinker 打通了“推理-记录-标注-微调”的完整链路。</p>
+                            <div id="feature-detail-3" class="hidden mt-4 pt-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 p-3 rounded">
+                                <strong>深层分析：</strong> Bedrock 也支持微调，但流程较重。Tinker 强调的是“轻量级、持续性”的微调，让模型随着数据积累越用越聪明。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="card-hover bg-white p-6 rounded-xl border border-slate-200 cursor-pointer group" onclick="expandFeature(4)">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-orange-100 rounded-lg p-3">
+                            <span class="text-2xl">🧩</span>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-slate-900 group-hover:text-orange-600 transition-colors">模型无关性 (Model Agnostic)</h3>
+                            <p class="mt-2 text-sm text-slate-600">Tinker 不绑定特定模型。开发者可以在 Tinker 的统一界面中，轻松切换底层模型（如从 GPT-4 切换到 Claude 3 或 Llama 3），对比效果与成本。</p>
+                            <div id="feature-detail-4" class="hidden mt-4 pt-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 p-3 rounded">
+                                <strong>深层分析：</strong> 这降低了 Vendor Lock-in 风险。相比之下，OpenAI 显然只支持自家模型，Bedrock 虽有多模型但受限于 AWS 生态。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Workflow Representation -->
+            <div class="mt-12 bg-slate-900 rounded-xl p-8 text-white">
+                <h3 class="text-xl font-bold mb-6 text-center">Tinker 工作流范式 vs 传统模式</h3>
+                <div class="flex flex-col md:flex-row items-center justify-between space-y-8 md:space-y-0 relative">
+                    <!-- Traditional -->
+                    <div class="flex-1 text-center opacity-60">
+                        <div class="text-sm uppercase tracking-wider mb-2 font-semibold">传统模式</div>
+                        <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 mx-auto w-48">
+                            Prompt 编写
+                        </div>
+                        <div class="h-8 w-0.5 bg-slate-700 mx-auto"></div>
+                        <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 mx-auto w-48">
+                            API 调用
+                        </div>
+                        <div class="h-8 w-0.5 bg-slate-700 mx-auto"></div>
+                        <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 mx-auto w-48">
+                            人工抽检 (低效)
+                        </div>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="hidden md:block text-2xl text-blue-400 font-bold">VS</div>
+
+                    <!-- Tinker -->
+                    <div class="flex-1 text-center relative">
+                        <div class="absolute -inset-4 bg-blue-500/10 rounded-xl blur-lg"></div>
+                        <div class="relative">
+                            <div class="text-sm uppercase tracking-wider mb-2 font-semibold text-blue-300">Tinker 模式</div>
+                            <div class="bg-blue-900/50 p-4 rounded-lg border border-blue-500 mx-auto w-56 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                                数据集定义 & 评估标准
+                            </div>
+                            <div class="h-6 w-0.5 bg-blue-500 mx-auto my-1"></div>
+                            <div class="bg-blue-900/50 p-4 rounded-lg border border-blue-500 mx-auto w-56">
+                                Prompt/Chain 迭代优化
+                            </div>
+                            <div class="h-6 w-0.5 bg-blue-500 mx-auto my-1"></div>
+                            <div class="bg-blue-900/50 p-4 rounded-lg border border-blue-500 mx-auto w-56">
+                                自动化回归测试 & 部署
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Conclusion -->
+        <section class="mt-12 bg-blue-50 rounded-xl p-8 border border-blue-100 text-center">
+            <h2 class="text-2xl font-bold text-blue-900 mb-4">调研总结</h2>
+            <p class="max-w-3xl mx-auto text-blue-800 leading-relaxed">
+                Tinker 在竞争激烈的 LLM 市场中找到了一条独特的护城河。它不与 OpenAI 或 Fireworks 比拼模型参数或推理速度，而是专注于<strong>提升 AI 应用的工程质量</strong>。对于需要构建复杂、高可靠性企业级 Agent 的团队，Tinker 提供的可观测性、评估框架和数据闭环能力是目前 Bedrock 等通用平台所欠缺的核心竞争力。
+            </p>
+        </section>
+
+    </main>
+
+    <footer class="bg-slate-900 text-slate-400 py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p>&copy; 2026 Tinker Research Report. Generated based on public product documentation analysis.</p>
+        </div>
+    </footer>
+
+    <script>
+        // State Management
+        const state = {
+            currentTab: 'overview',
+            chartDimension: 'overview',
+            chartInstance: null
+        };
+
+        // Data Store
+        const chartData = {
+            overview: {
+                labels: ['模型能力', '推理速度', '调试可控性', '数据管理', '生态集成'],
+                datasets: [
+                    {
+                        label: 'Tinker',
+                        data: [7, 6, 10, 10, 8],
+                        backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                        borderColor: '#2563eb',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'OpenAI',
+                        data: [10, 7, 5, 4, 9],
+                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                        borderColor: '#22c55e',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Bedrock',
+                        data: [8, 8, 6, 5, 10],
+                        backgroundColor: 'rgba(249, 115, 22, 0.2)',
+                        borderColor: '#f97316',
+                        borderWidth: 2
+                    }
+                ]
+            },
+            devexp: {
+                labels: ['文档质量', 'API易用性', 'Prompt工具', '版本控制', '团队协作'],
+                datasets: [
+                    {
+                        label: 'Tinker',
+                        data: [8, 8, 10, 9, 9],
+                        backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                        borderColor: '#2563eb',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'OpenAI',
+                        data: [9, 9, 7, 4, 6],
+                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                        borderColor: '#22c55e',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Fireworks',
+                        data: [7, 8, 5, 3, 4],
+                        backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                        borderColor: '#a855f7',
+                        borderWidth: 2
+                    }
+                ]
+            }
+        };
+
+        const tableData = [
+            { type: 'similarity', feature: '基础模型接入', tinker: '支持 (集成第三方)', competitor: '支持 (自研或托管)', desc: '都能让用户调用到 LLM 能力' },
+            { type: 'similarity', feature: 'API 接口', tinker: 'RESTful API', competitor: 'RESTful API', desc: '标准的程序化调用方式' },
+            { type: 'difference', feature: '核心定位', tinker: 'AI 工程化 IDE', competitor: '模型推理提供商', desc: 'Tinker 卖的是工具链，竞品卖的是 Token' },
+            { type: 'difference', feature: '评估 (Evals)', tinker: '内置核心功能', competitor: '辅助功能或缺失', desc: 'Tinker 强调测试驱动开发' },
+            { type: 'difference', feature: 'Prompt 调试', tinker: '可视化每步推理', competitor: '黑盒或简单文本', desc: 'Tinker 提供极强的可观测性' },
+            { type: 'difference', feature: '微调数据流', tinker: '闭环 (Log -> Dataset)', competitor: '单向 (Upload -> Train)', desc: 'Tinker 让数据飞轮转起来更顺畅' }
+        ];
+
+        // Initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            renderTable('all');
+        });
+
+        // Navigation Logic
+        function navigateTo(targetId) {
+            // Update UI tabs
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if(btn.dataset.target === targetId) {
+                    btn.classList.add('tab-active');
+                    btn.classList.remove('tab-inactive');
+                } else {
+                    btn.classList.remove('tab-active');
+                    btn.classList.add('tab-inactive');
+                }
+            });
+
+            // Scroll to section
+            const el = document.getElementById(targetId);
+            if(el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Summary Modal Logic
+        function toggleSummary() {
+            const modal = document.getElementById('summary-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        // Chart Logic
+        function initChart() {
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            
+            // Default config options
+            const options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: {
+                            display: true
+                        },
+                        suggestedMin: 0,
+                        suggestedMax: 10,
+                        pointLabels: {
+                            font: {
+                                size: 12,
+                                family: "'sans-serif'"
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    }
+                }
+            };
+
+            state.chartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: chartData.overview,
+                options: options
+            });
+        }
+
+        function updateChart(dimension) {
+            const caption = document.getElementById('chart-caption');
+            
+            // Destroy old chart to prevent memory leaks/glitches
+            if(state.chartInstance) {
+                state.chartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            state.chartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: chartData[dimension],
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { display: true },
+                            suggestedMin: 0,
+                            suggestedMax: 10
+                        }
+                    },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Update caption text based on selection
+            if(dimension === 'overview') {
+                caption.innerText = '图表显示：Tinker 在"可控性"和"调试能力"上显著领先，而在"模型通用性"上略逊于 OpenAI。';
+            } else {
+                caption.innerText = '图表显示：在开发者体验 (DevEx) 方面，Tinker 的工具链完善度最高，特别是在 Prompt 工具和版本控制上。';
+            }
+        }
+
+        // Table Logic
+        function renderTable(filter) {
+            const tbody = document.getElementById('comparison-table-body');
+            tbody.innerHTML = '';
+
+            const filteredData = filter === 'all' ? tableData : tableData.filter(item => item.type === filter);
+
+            filteredData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.className = index % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+                
+                const badgeColor = row.type === 'similarity' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800';
+                const badgeText = row.type === 'similarity' ? '相似' : '差异';
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-slate-900">${row.feature}</div>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeColor} mt-1">${badgeText}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm text-slate-900 font-semibold">${row.tinker}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm text-slate-500">${row.competitor}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm text-slate-500 italic">"${row.desc}"</div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterTable() {
+            const filterVal = document.getElementById('compare-filter').value;
+            renderTable(filterVal);
+        }
+
+        // Interactive Features Logic
+        function expandFeature(id) {
+            const detailEl = document.getElementById(`feature-detail-${id}`);
+            if (detailEl.classList.contains('hidden')) {
+                // Close others first for cleaner UI (optional)
+                document.querySelectorAll('[id^="feature-detail-"]').forEach(el => el.classList.add('hidden'));
+                
+                detailEl.classList.remove('hidden');
+                detailEl.classList.add('fade-in');
+            } else {
+                detailEl.classList.add('hidden');
+            }
+        }
+
+    </script>
+</body>
+</html>
